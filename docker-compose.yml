@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # MongoDB Database Service
+  mongo:
+    image: mongo:latest
+    container_name: shop-order-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  # Redis Service (required for BullMQ queue)
+  redis:
+    image: redis:latest
+    container_name: shop-order-redis
+    ports:
+      - "6379:6379"
+
+  # Node.js API Service
+  api:
+    build: .
+    container_name: shop-order-api
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+      # If using voice processing, map credentials here
+      - ./google-credentials.json:/usr/src/app/google-credentials.json
+    ports:
+      - "3000:3000"
+    environment:
+      # Inject all environment variables from .env
+      MONGO_URI: mongodb://mongo:27017/shoporders
+      REDIS_HOST: redis
+      NODE_ENV: development
+    depends_on:
+      - mongo
+      - redis
+    # COMMAND: Runs the API server AND the worker process concurrently
+    command: sh -c "npx concurrently 'node src/app.js' 'node src/worker/order.worker.js'"
+volumes:
+  mongo-data:
